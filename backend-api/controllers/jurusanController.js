@@ -1,9 +1,13 @@
 const db = require('../config/db');
 
-// GET ALL
+// GET ALL (Update: ORDER BY fakultas ASC, lalu nama_jurusan ASC)
 const getAllJurusan = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM jurusan ORDER BY kode_jurusan ASC');
+        // Kita urutkan berdasarkan Fakultas dulu, baru Nama Jurusan.
+        // Hasilnya: Fakultas Ekonomi (Akuntansi, Manajemen), Fakultas Teknik (Informatika, Sipil), dst.
+        const sql = 'SELECT * FROM jurusan ORDER BY fakultas ASC, nama_jurusan ASC';
+        
+        const [rows] = await db.query(sql);
         res.json({ success: true, data: rows });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
