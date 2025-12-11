@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, reactive, computed, watch } from 'vue'; // Tambah 'watch'
+import { ref, onMounted, reactive, computed, watch } from 'vue';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import { showToast, confirmDialog, showAlert } from '../utils/swal';
@@ -20,25 +20,42 @@ const form = reactive({
     id_mahasiswa: '',
     id_matakuliah: '',
     semester: '20242',
-    // KOMPONEN NILAI BARU
+    // KOMPONEN NILAI
+    has_praktikum: false, // Switch logic
     nilai_tugas: 0,
+    nilai_praktikum: 0, // Baru
     nilai_uts: 0,
     nilai_uas: 0,
-    total_nilai: 0, // Skala 0-100
-    nilai_angka: 0, // Bobot 4.0 (Otomatis)
-    nilai_huruf: 'E' // Grade (Otomatis)
+    total_nilai: 0,
+    nilai_angka: 0,
+    nilai_huruf: 'E'
 });
 
-// --- RUMUS OTOMATIS (THE MAGIC) ---
-// Kita pantau perubahan pada Tugas, UTS, UAS
+// --- RUMUS OTOMATIS (THE MAGIC V2) ---
 watch(
-    () => [form.nilai_tugas, form.nilai_uts, form.nilai_uas],
-    ([tugas, uts, uas]) => {
-        // 1. Hitung Total Nilai (Bobot: Tugas 30%, UTS 35%, UAS 35%)
-        const total = (Number(tugas) * 0.3) + (Number(uts) * 0.35) + (Number(uas) * 0.35);
+    // Pantau semua variabel nilai + status praktikum
+    () => [form.nilai_tugas, form.nilai_praktikum, form.nilai_uts, form.nilai_uas, form.has_praktikum],
+    ([tugas, prak, uts, uas, hasPrak]) => {
+        let total = 0;
+        
+        if (hasPrak) {
+            // SKENARIO 1: ADA PRAKTIKUM (4 Komponen)
+            // Tugas 20%, Prak 20%, UTS 30%, UAS 30%
+            total = (Number(tugas) * 0.20) + 
+                    (Number(prak) * 0.20) + 
+                    (Number(uts) * 0.30) + 
+                    (Number(uas) * 0.30);
+        } else {
+            // SKENARIO 2: TEORI SAJA (3 Komponen)
+            // Tugas 30%, UTS 35%, UAS 35%
+            total = (Number(tugas) * 0.30) + 
+                    (Number(uts) * 0.35) + 
+                    (Number(uas) * 0.35);
+        }
+
         form.total_nilai = total.toFixed(2);
 
-        // 2. Tentukan Grade & Bobot IPK
+        // Konversi ke Grade
         if (total >= 80) { form.nilai_huruf = 'A'; form.nilai_angka = 4.0; }
         else if (total >= 75) { form.nilai_huruf = 'B+'; form.nilai_angka = 3.5; }
         else if (total >= 70) { form.nilai_huruf = 'B'; form.nilai_angka = 3.0; }
@@ -52,8 +69,7 @@ watch(
 // --- COMPUTED ---
 const availableSemesters = computed(() => {
     if (!selectedMahasiswaId.value) return [];
-    const studentKrs = listKrs.value.filter(k => k.id_mahasiswa == selectedMahasiswaId.value);
-    const sems = studentKrs.map(k => k.semester);
+    const sems = listKrs.value.filter(k => k.id_mahasiswa == selectedMahasiswaId.value).map(k => k.semester);
     return [...new Set(sems)].sort((a,b) => b - a);
 });
 
@@ -72,13 +88,12 @@ const activeStudentDetails = computed(() => {
     return null;
 });
 
-// Hitung IPK/IPS pakai 'nilai_angka' (Bobot 4.0)
 const hitungIPS = computed(() => {
     if (!selectedMahasiswaId.value || !selectedSemesterFilter.value) return "0.00";
     let totalSks = 0, totalMutu = 0;
     filteredKrs.value.forEach(krs => {
         const sks = Number(krs.sks || 0);
-        const bobot = Number(krs.nilai_angka || 0); // Pakai Bobot 4.0
+        const bobot = Number(krs.nilai_angka || 0);
         totalSks += sks;
         totalMutu += (sks * bobot);
     });
@@ -99,28 +114,27 @@ const hitungIPK = computed(() => {
 });
 
 // --- ACTIONS ---
-const fetchKrs = async () => {
+const fetchAllData = async () => {
+    isLoading.value = true;
     try {
-        const response = await axios.get('http://localhost:3000/api/krs');
-        if(response.data.success) listKrs.value = response.data.data;
-    } catch (e) { console.error(e); }
-};
-const fetchMahasiswa = async () => {
-    try {
-        const response = await axios.get('http://localhost:3000/api/mahasiswa');
-        if(response.data.success) listMahasiswa.value = response.data.data;
-    } catch (e) { console.error(e); }
-};
-const fetchMatakuliah = async () => {
-    try {
-        const response = await axios.get('http://localhost:3000/api/matakuliah');
-        if(response.data.success) listMatakuliah.value = response.data.data;
-    } catch (e) { console.error(e); }
+        const [krsRes, mhsRes, mkRes] = await Promise.all([
+            axios.get('http://localhost:3000/api/krs'),
+            axios.get('http://localhost:3000/api/mahasiswa'),
+            axios.get('http://localhost:3000/api/matakuliah')
+        ]);
+        if(krsRes.data.success) listKrs.value = krsRes.data.data;
+        if(mhsRes.data.success) listMahasiswa.value = mhsRes.data.data;
+        if(mkRes.data.success) listMatakuliah.value = mkRes.data.data;
+    } catch (e) { console.error(e); } 
+    finally { isLoading.value = false; }
 };
 
 const simpanData = async () => {
     try {
         isSubmitting.value = true;
+        // Jika tidak ada praktikum, pastikan nilai praktikum 0 agar database bersih
+        if (!form.has_praktikum) form.nilai_praktikum = 0;
+        
         if (editId.value) {
             await axios.put(`http://localhost:3000/api/krs/${editId.value}`, form);
             showToast('Nilai Updated!');
@@ -129,7 +143,7 @@ const simpanData = async () => {
             showToast('Nilai Tersimpan!');
         }
         tutupModal();
-        fetchKrs();
+        fetchAllData();
     } catch (error) { showAlert('Error', 'Gagal simpan data', 'error'); } 
     finally { isSubmitting.value = false; }
 };
@@ -140,7 +154,7 @@ const hapusData = async (id) => {
         try {
             await axios.delete(`http://localhost:3000/api/krs/${id}`);
             showToast('Terhapus!');
-            fetchKrs();
+            fetchAllData();
         } catch (e) { showAlert('Error', 'Gagal hapus', 'error'); }
     }
 };
@@ -162,8 +176,8 @@ const bukaModalTambah = () => {
     editId.value = null;
     form.id_mahasiswa = selectedMahasiswaId.value || ''; 
     form.id_matakuliah = ''; form.semester = selectedSemesterFilter.value || '20242';
-    // Reset Nilai
-    form.nilai_tugas = 0; form.nilai_uts = 0; form.nilai_uas = 0;
+    form.has_praktikum = false; // Default Teori
+    form.nilai_tugas = 0; form.nilai_praktikum = 0; form.nilai_uts = 0; form.nilai_uas = 0;
     form.total_nilai = 0; form.nilai_angka = 0; form.nilai_huruf = 'E';
     showModal.value = true;
 };
@@ -172,11 +186,14 @@ const bukaModalEdit = (item) => {
     editId.value = item.id;
     form.id_mahasiswa = item.id_mahasiswa; form.id_matakuliah = item.id_matakuliah;
     form.semester = item.semester; 
-    // Load Nilai Lama
+    
+    // Cek apakah ada nilai praktikum? kalau ada > 0, otomatis centang
+    form.nilai_praktikum = item.nilai_praktikum || 0;
+    form.has_praktikum = form.nilai_praktikum > 0;
+
     form.nilai_tugas = item.nilai_tugas || 0;
     form.nilai_uts = item.nilai_uts || 0;
     form.nilai_uas = item.nilai_uas || 0;
-    // Pemicu watch agar hitung ulang (total & grade)
     form.total_nilai = item.total_nilai || 0;
     form.nilai_angka = item.nilai_angka || 0;
     form.nilai_huruf = item.nilai_huruf || 'E';
@@ -185,7 +202,7 @@ const bukaModalEdit = (item) => {
 };
 const tutupModal = () => { showModal.value = false; };
 
-onMounted(() => { fetchKrs(); fetchMahasiswa(); fetchMatakuliah(); });
+onMounted(() => { fetchAllData(); });
 </script>
 
 <template>
@@ -249,19 +266,20 @@ onMounted(() => { fetchKrs(); fetchMahasiswa(); fetchMatakuliah(); });
                         <thead class="bg-gray-100">
                             <tr>
                                 <th class="border border-gray-400 px-2 py-2 w-10">No</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16">Smt</th>
+                                <th class="border border-gray-400 px-2 py-2 w-12 text-center">Smt</th>
                                 <th class="border border-gray-400 px-2 py-2">Matakuliah</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">SKS</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">Tugas</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">UTS</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">UAS</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16 text-center bg-gray-50">Total</th>
-                                <th class="border border-gray-400 px-2 py-2 w-16 text-center font-bold bg-yellow-50">Huruf</th>
+                                <th class="border border-gray-400 px-2 py-2 w-12 text-center">SKS</th>
+                                <th class="border border-gray-400 px-2 py-2 w-12 text-center text-xs">Tugas</th>
+                                <th class="border border-gray-400 px-2 py-2 w-12 text-center text-xs">Prak</th>
+                                <th class="border border-gray-400 px-2 py-2 w-12 text-center text-xs">UTS</th>
+                                <th class="border border-gray-400 px-2 py-2 w-12 text-center text-xs">UAS</th>
+                                <th class="border border-gray-400 px-2 py-2 w-14 text-center bg-gray-50">Total</th>
+                                <th class="border border-gray-400 px-2 py-2 w-14 text-center font-bold bg-yellow-50">Huruf</th>
                                 <th class="border border-gray-400 px-2 py-2 w-20 text-center" data-html2canvas-ignore="true">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="filteredKrs.length === 0"><td colspan="10" class="text-center p-4 text-gray-500 border border-gray-400">Belum ada data nilai.</td></tr>
+                            <tr v-if="filteredKrs.length === 0"><td colspan="11" class="text-center p-4 text-gray-500 border border-gray-400">Belum ada data nilai.</td></tr>
                             
                             <tr v-for="(item, index) in filteredKrs" :key="item.id">
                                 <td class="border border-gray-400 px-2 py-2 text-center">{{ index + 1 }}</td>
@@ -272,6 +290,7 @@ onMounted(() => { fetchKrs(); fetchMahasiswa(); fetchMatakuliah(); });
                                 </td>
                                 <td class="border border-gray-400 px-2 py-2 text-center">{{ item.sks }}</td>
                                 <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_tugas }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_praktikum || '-' }}</td>
                                 <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_uts }}</td>
                                 <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_uas }}</td>
                                 <td class="border border-gray-400 px-2 py-2 text-center font-bold bg-gray-50">{{ item.total_nilai }}</td>
@@ -308,26 +327,47 @@ onMounted(() => { fetchKrs(); fetchMahasiswa(); fetchMatakuliah(); });
                             </select>
                         </div>
                     </div>
-
                     <div class="mb-4">
                         <label class="block text-xs font-bold text-gray-500 uppercase">Semester</label>
                         <input v-model="form.semester" type="text" class="border rounded w-full py-2 px-3" placeholder="20242">
                     </div>
 
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
-                        <h3 class="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Rincian Nilai (0-100)</h3>
-                        <div class="grid grid-cols-3 gap-3">
+                        <div class="flex justify-between items-center mb-4 border-b pb-2">
+                            <h3 class="text-sm font-bold text-gray-700">Rincian Nilai (0-100)</h3>
+                            
+                            <label class="flex items-center cursor-pointer">
+                                <span class="mr-2 text-xs font-bold" :class="form.has_praktikum ? 'text-indigo-600' : 'text-gray-400'">Ada Praktikum?</span>
+                                <input type="checkbox" v-model="form.has_praktikum" class="form-checkbox h-4 w-4 text-indigo-600">
+                            </label>
+                        </div>
+                        
+                        <div class="grid gap-3" :class="form.has_praktikum ? 'grid-cols-4' : 'grid-cols-3'">
                             <div>
-                                <label class="block text-xs text-gray-500">Tugas (30%)</label>
-                                <input v-model="form.nilai_tugas" type="number" min="0" max="100" class="border rounded w-full py-1 px-2 text-center focus:ring-2 focus:ring-indigo-500">
+                                <label class="block text-[10px] text-gray-500 text-center mb-1">
+                                    Tugas <br> <span class="font-bold text-indigo-500">{{ form.has_praktikum ? '20%' : '30%' }}</span>
+                                </label>
+                                <input v-model="form.nilai_tugas" type="number" min="0" max="100" class="border rounded w-full py-1 px-1 text-center font-bold">
+                            </div>
+                            
+                            <div v-if="form.has_praktikum">
+                                <label class="block text-[10px] text-gray-500 text-center mb-1">
+                                    Prak <br> <span class="font-bold text-indigo-500">20%</span>
+                                </label>
+                                <input v-model="form.nilai_praktikum" type="number" min="0" max="100" class="border rounded w-full py-1 px-1 text-center font-bold bg-indigo-50 border-indigo-200">
+                            </div>
+
+                            <div>
+                                <label class="block text-[10px] text-gray-500 text-center mb-1">
+                                    UTS <br> <span class="font-bold text-indigo-500">{{ form.has_praktikum ? '30%' : '35%' }}</span>
+                                </label>
+                                <input v-model="form.nilai_uts" type="number" min="0" max="100" class="border rounded w-full py-1 px-1 text-center font-bold">
                             </div>
                             <div>
-                                <label class="block text-xs text-gray-500">UTS (35%)</label>
-                                <input v-model="form.nilai_uts" type="number" min="0" max="100" class="border rounded w-full py-1 px-2 text-center focus:ring-2 focus:ring-indigo-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs text-gray-500">UAS (35%)</label>
-                                <input v-model="form.nilai_uas" type="number" min="0" max="100" class="border rounded w-full py-1 px-2 text-center focus:ring-2 focus:ring-indigo-500">
+                                <label class="block text-[10px] text-gray-500 text-center mb-1">
+                                    UAS <br> <span class="font-bold text-indigo-500">{{ form.has_praktikum ? '30%' : '35%' }}</span>
+                                </label>
+                                <input v-model="form.nilai_uas" type="number" min="0" max="100" class="border rounded w-full py-1 px-1 text-center font-bold">
                             </div>
                         </div>
                         
@@ -344,8 +384,8 @@ onMounted(() => { fetchKrs(); fetchMahasiswa(); fetchMatakuliah(); });
                     </div>
 
                     <div class="flex justify-end space-x-2">
-                        <button type="button" @click="tutupModal" class="px-4 py-2 bg-gray-200 rounded">Batal</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded font-bold">Simpan Nilai</button>
+                        <button type="button" @click="tutupModal" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded font-bold shadow-md">Simpan</button>
                     </div>
                 </form>
             </div>
