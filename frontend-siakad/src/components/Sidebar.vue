@@ -3,7 +3,7 @@ import { defineProps, defineEmits } from 'vue';
 
 // Terima props isOpen dari App.vue
 const props = defineProps(['activeTab', 'isOpen']);
-const emit = defineEmits(['changeTab']);
+const emit = defineEmits(['changeTab', 'triggerLogout']);
 
 const menuItems = [
   { id: 'home', label: 'Dashboard', icon: 'fas fa-home' },
@@ -13,8 +13,13 @@ const menuItems = [
   { id: 'krs', label: 'Input KRS', icon: 'fas fa-file-signature' },
 ];
 
-const selectTab = (id) => {
-  emit('changeTab', id);
+const selectTab = (id) => { emit('changeTab', id); };
+
+// Fungsi Logout Baru
+const logout = () => {
+    if(confirm("Yakin ingin keluar dari sistem?")) {
+        emit('triggerLogout');
+    }
 };
 </script>
 
@@ -59,7 +64,7 @@ const selectTab = (id) => {
     </nav>
 
     <div class="p-4 border-t border-slate-800">
-      <button class="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded transition">
+      <button @click="logout" class="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded transition">
         <i class="fas fa-sign-out-alt w-6"></i>
         <span>Logout</span>
       </button>
