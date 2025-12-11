@@ -2,6 +2,8 @@
 import { ref, onMounted, reactive, computed } from 'vue'; // Tambah 'computed'
 import axios from 'axios';
 
+import { showToast, confirmDialog, showAlert } from '../utils/swal';
+
 const matakuliah = ref([]);
 const isLoading = ref(true);
 const showModal = ref(false);
@@ -58,23 +60,26 @@ const simpanData = async () => {
         } else {
             await axios.post('http://localhost:3000/api/matakuliah', form);
         }
-        alert("Berhasil menyimpan data!");
+        showToast('Matakuliah berhasil disimpan!'); // <--- Baru
         tutupModal();
         fetchMatakuliah();
     } catch (error) {
-        alert("Gagal menyimpan data");
+        showAlert('Error', 'Gagal menyimpan data', 'error'); // <--- Baru
     } finally {
         isSubmitting.value = false;
     }
 };
 
 const hapusData = async (id, nama) => {
-    if(confirm(`Hapus matakuliah ${nama}?`)) {
+    const yakin = await confirmDialog('Hapus Matakuliah?', `MK ${nama} akan dihapus.`);
+    
+    if(yakin) {
         try {
             await axios.delete(`http://localhost:3000/api/matakuliah/${id}`);
+            showToast('Matakuliah dihapus!');
             fetchMatakuliah();
         } catch (error) {
-            alert("Gagal menghapus");
+            showAlert('Gagal', 'Terjadi kesalahan sistem', 'error');
         }
     }
 }

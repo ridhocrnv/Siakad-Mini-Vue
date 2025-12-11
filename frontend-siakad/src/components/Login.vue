@@ -2,6 +2,8 @@
 import { ref, reactive } from 'vue';
 import axios from 'axios';
 
+import { showToast, showAlert } from '../utils/swal';
+
 // Event untuk memberitahu App.vue kalau login sukses
 const emit = defineEmits(['loginSuccess']);
 
@@ -37,14 +39,16 @@ const submitForm = async () => {
             // 1. Simpan Token & User di LocalStorage browser
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.user));
+
+            showToast(`Selamat datang, ${response.data.user.username}!`);
             
             // 2. Beritahu App.vue untuk ganti tampilan
             emit('loginSuccess');
         }
 
     } catch (error) {
-        console.error(error);
-        errorMessage.value = error.response?.data?.message || "Terjadi kesalahan server.";
+        const msg = error.response?.data?.message || "Terjadi kesalahan server.";
+        showAlert('Gagal Masuk', msg, 'error');
     } finally {
         isLoading.value = false;
     }

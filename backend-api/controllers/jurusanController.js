@@ -10,7 +10,7 @@ const getAllJurusan = async (req, res) => {
     }
 };
 
-// CREATE (Update: Tambah fakultas & jenjang)
+
 const createJurusan = async (req, res) => {
     try {
         const { kode_jurusan, nama_jurusan, fakultas, jenjang } = req.body;

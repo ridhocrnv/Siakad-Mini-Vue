@@ -1,6 +1,8 @@
 <script setup>
 import { defineProps, defineEmits } from 'vue';
 
+import { confirmDialog, showToast } from '../utils/swal';
+
 // 1. TERIMA PROPS 'user'
 const props = defineProps(['activeTab', 'isOpen', 'user']);
 const emit = defineEmits(['changeTab', 'triggerLogout']);
@@ -15,8 +17,15 @@ const menuItems = [
 
 const selectTab = (id) => { emit('changeTab', id); };
 
-const logout = () => {
-    if(confirm("Yakin ingin keluar?")) {
+const logout = async () => {
+    const yakin = await confirmDialog(
+        'Logout?', 
+        'Anda harus login kembali untuk mengakses sistem.', 
+        'Ya, Keluar'
+    );
+
+    if(yakin) {
+        showToast('Anda berhasil logout', 'info');
         emit('triggerLogout');
     }
 };

@@ -9,6 +9,7 @@ const jurusanRoutes = require('./routes/jurusanRoutes');
 const matakuliahRoutes = require('./routes/matakuliahRoutes');
 const krsRoutes = require('./routes/krsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -40,6 +41,9 @@ app.use('/api/krs', krsRoutes);
 
 // 5. Route Dashboard
 app.use('/api/dashboard', dashboardRoutes);
+
+// 6. Route Auth (Register & Login)
+app.use('/api/auth', authRoutes);
 
 // --- BASE ROUTE (TESTING) ---
 app.get('/', (req, res) => {

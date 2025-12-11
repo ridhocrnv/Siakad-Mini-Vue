@@ -2,6 +2,8 @@
 import { ref, onMounted, reactive, computed } from 'vue'; // Tambah 'computed'
 import axios from 'axios';
 
+import { showToast, confirmDialog, showAlert } from '../utils/swal';
+
 const listJurusan = ref([]);
 const isLoading = ref(true);
 const showModal = ref(false);
@@ -46,7 +48,10 @@ const fetchJurusan = async () => {
 };
 
 const simpanData = async () => {
-    if(!form.kode_jurusan || !form.nama_jurusan || !form.fakultas) return alert("Semua data wajib diisi");
+    // Validasi
+    if(!form.kode_jurusan || !form.nama_jurusan || !form.fakultas) {
+        return showToast('Semua data wajib diisi!', 'warning'); // <--- Toast Warning
+    }
     
     try {
         isSubmitting.value = true;
@@ -55,22 +60,25 @@ const simpanData = async () => {
         } else {
             await axios.post('http://localhost:3000/api/jurusan', form);
         }
-        alert("Berhasil!");
+        showToast('Data Jurusan tersimpan!'); // <--- Toast Success
         tutupModal();
         fetchJurusan();
     } catch (e) {
-        alert("Gagal menyimpan data");
+        showAlert('Error', 'Gagal menyimpan data jurusan', 'error');
     } finally {
         isSubmitting.value = false;
     }
 };
 
 const hapusData = async (id, nama) => {
-    if(confirm(`Hapus jurusan ${nama}?`)) {
+    const isConfirmed = await confirmDialog('Hapus Jurusan?', `Jurusan ${nama} akan dihapus.`);
+    
+    if(isConfirmed) {
         try {
             await axios.delete(`http://localhost:3000/api/jurusan/${id}`);
+            showToast('Jurusan terhapus!');
             fetchJurusan();
-        } catch (e) { alert("Gagal hapus"); }
+        } catch (e) { showAlert('Gagal', 'Tidak bisa hapus (mungkin ada mahasiswa?)', 'error'); }
     }
 };
 

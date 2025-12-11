@@ -2,6 +2,8 @@
 import { ref, onMounted, reactive, computed } from 'vue'; // <--- Tambah 'computed'
 import axios from 'axios';
 
+import { showToast, confirmDialog, showAlert } from '../utils/swal'
+
 // ... (State lama tetap sama: mahasiswa, listJurusan, dll) ...
 const mahasiswa = ref([]);
 const listJurusan = ref([]);
@@ -81,36 +83,42 @@ const formatDate = (dateString) => {
 
 // ... (Function Simpan & Hapus tetap sama) ...
 const simpanMahasiswa = async () => {
-    /* ... Logika simpan yang lama ... */
-     try {
+    try {
         isSubmitting.value = true;
         if (editId.value) {
             await axios.put(`http://localhost:3000/api/mahasiswa/${editId.value}`, form);
-            alert("Berhasil update data!");
+            showToast('Data berhasil diperbarui!'); // <--- GANTI ALERT
         } else {
             await axios.post('http://localhost:3000/api/mahasiswa', form);
-            alert("Berhasil menambah data!");
+            showToast('Data berhasil ditambahkan!'); // <--- GANTI ALERT
         }
         tutupModal();
         fetchData(); 
     } catch (error) {
-        alert("Gagal menyimpan data!");
+        console.error(error);
+        showAlert('Error!', 'Gagal menyimpan data mahasiswa.', 'error'); // <--- GANTI ALERT ERROR
     } finally {
         isSubmitting.value = false;
     }
 };
 
 const hapusMahasiswa = async (id, nama) => {
-     /* ... Logika hapus yang lama ... */
-     if (confirm(`Hapus data ${nama}?`)) {
+    // Pakai Confirm Dialog Custom
+    const isConfirmed = await confirmDialog(
+        'Hapus Mahasiswa?', 
+        `Data ${nama} akan hilang permanen.`
+    );
+
+    if (isConfirmed) {
         try {
             await axios.delete(`http://localhost:3000/api/mahasiswa/${id}`);
-            alert("Terhapus!");
+            showToast('Data berhasil dihapus!', 'success'); // <--- TOAST
             fetchData(); 
-        } catch (error) { alert("Gagal menghapus."); }
+        } catch (error) { 
+            showAlert('Gagal!', 'Terjadi kesalahan saat menghapus.', 'error'); 
+        }
     }
 };
-
 // ... Modal Helpers ...
 const bukaModalTambah = () => { editId.value = null; resetForm(); showModal.value = true; };
 const bukaModalEdit = (data) => { 

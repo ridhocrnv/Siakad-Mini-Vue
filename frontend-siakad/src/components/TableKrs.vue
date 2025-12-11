@@ -3,6 +3,8 @@ import { ref, onMounted, reactive, computed } from 'vue';
 import axios from 'axios';
 import html2pdf from 'html2pdf.js'; // Import Library PDF
 
+import { showToast, confirmDialog, showAlert } from '../utils/swal';
+
 // --- STATE ---
 const listKrs = ref([]);
 const listMahasiswa = ref([]);
@@ -55,19 +57,21 @@ const simpanData = async () => {
         } else {
             await axios.post('http://localhost:3000/api/krs', form);
         }
-        alert("Berhasil!");
+        showToast('KRS Berhasil disimpan!'); // <--- Baru
         tutupModal();
         fetchKrs();
-    } catch (error) { alert("Gagal menyimpan data"); }
+    } catch (error) { showAlert('Gagal', 'Gagal menyimpan data KRS', 'error'); } 
     finally { isSubmitting.value = false; }
 };
 
 const hapusData = async (id) => {
-    if (confirm("Hapus data KRS ini?")) {
+    const yakin = await confirmDialog('Hapus KRS?', 'Data KRS ini akan dihapus permanen.');
+    if(yakin) {
         try {
             await axios.delete(`http://localhost:3000/api/krs/${id}`);
+            showToast('KRS terhapus!');
             fetchKrs();
-        } catch (e) { alert("Gagal hapus"); }
+        } catch (e) { showAlert('Error', 'Gagal menghapus data', 'error'); }
     }
 };
 
