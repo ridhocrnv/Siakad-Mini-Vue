@@ -263,7 +263,7 @@ const cetakPdf = async (tipe) => {
         `).join('');
 
         const totalSksCetak = dataToPrint.reduce((sum, item) => sum + (parseFloat(item.sks) || 0), 0);
-        const logoUrl = "./public/logo_uho.png";
+        const logoUrl = "./public/logo-uho.png";
 
         // 2. Layout HTML
         const content = document.createElement('div');
