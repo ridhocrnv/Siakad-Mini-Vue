@@ -1,53 +1,61 @@
 <script setup>
 import { ref } from 'vue';
-import Navbar from './components/Navbar.vue';
-import Footer from './components/Footer.vue';
+import Sidebar from './components/Sidebar.vue'; // Sidebar Baru
+import Home from './components/Home.vue';       // Home Baru
 import TableMahasiswa from './components/TableMahasiswa.vue';
+import TableJurusan from './components/TableJurusan.vue';
 import TableMatakuliah from './components/TableMatakuliah.vue';
 import TableKrs from './components/TableKrs.vue';
-import TableJurusan from './components/TableJurusan.vue';
-import Dashboard from './components/Dashboard.vue'; // <--- Import Baru
 
-// Set default tab ke dashboard
-const activeTab = ref('dashboard'); 
+const activeTab = ref('home');
+
+const handleTabChange = (tabId) => {
+  activeTab.value = tabId;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+};
 </script>
 
 <template>
-  <div class="flex flex-col min-h-screen bg-gray-100">
-    <Navbar />
+  <div class="flex h-screen bg-gray-50 font-sans text-gray-900">
+    
+    <Sidebar :activeTab="activeTab" @changeTab="handleTabChange" />
 
-    <main class="flex-grow container mx-auto p-6">
+    <div class="flex-1 flex flex-col ml-64 min-h-screen transition-all duration-300">
       
-      <div class="flex space-x-4 mb-6 overflow-x-auto pb-2">
+      <header class="bg-white shadow-sm h-16 flex items-center justify-between px-8 sticky top-0 z-40">
+        <h1 class="text-xl font-bold text-gray-800 capitalize">
+          {{ activeTab === 'krs' ? 'Kartu Rencana Studi' : activeTab.replace('_', ' ') }}
+        </h1>
         
-        <button @click="activeTab = 'dashboard'" :class="['px-4 py-2 rounded-md font-medium transition whitespace-nowrap', activeTab === 'dashboard' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          🏠 Dashboard
-        </button>
+        <div class="flex items-center space-x-4">
+           <span class="text-sm text-gray-500">Semester Genap 2024/2025</span>
+           <div class="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
+             <i class="fas fa-bell"></i>
+           </div>
+        </div>
+      </header>
 
-        <button @click="activeTab = 'mahasiswa'" :class="['px-4 py-2 rounded-md font-medium transition whitespace-nowrap', activeTab === 'mahasiswa' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          Data Mahasiswa
-        </button>
+      <main class="flex-1 p-6 md:p-8 overflow-y-auto">
+        <transition name="fade" mode="out-in">
+          <div :key="activeTab">
+            <Home v-if="activeTab === 'home'" />
+            <TableMahasiswa v-if="activeTab === 'mahasiswa'" />
+            <TableJurusan v-if="activeTab === 'jurusan'" />
+            <TableMatakuliah v-if="activeTab === 'matakuliah'" />
+            <TableKrs v-if="activeTab === 'krs'" />
+          </div>
+        </transition>
+      </main>
 
-        <button @click="activeTab = 'jurusan'" :class="['px-4 py-2 rounded-md font-medium transition whitespace-nowrap', activeTab === 'jurusan' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          Data Jurusan
-        </button>
+      <footer class="bg-white border-t p-4 text-center text-xs text-gray-400">
+        &copy; {{ new Date().getFullYear() }} SIAKAD Mini UHO. Built with Vue 3 & Tailwind.
+      </footer>
 
-        <button @click="activeTab = 'matakuliah'" :class="['px-4 py-2 rounded-md font-medium transition whitespace-nowrap', activeTab === 'matakuliah' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          Data Matakuliah
-        </button>
-
-        <button @click="activeTab = 'krs'" :class="['px-4 py-2 rounded-md font-medium transition whitespace-nowrap', activeTab === 'krs' ? 'bg-indigo-600 text-white shadow' : 'bg-white text-gray-600 hover:bg-gray-50']">
-          Data KRS
-        </button>
-      </div>
-
-      <div v-if="activeTab === 'dashboard'"> <Dashboard /> </div> <div v-if="activeTab === 'mahasiswa'"> <TableMahasiswa /> </div>
-      <div v-if="activeTab === 'jurusan'"> <TableJurusan /> </div>
-      <div v-if="activeTab === 'matakuliah'"> <TableMatakuliah /> </div>
-      <div v-if="activeTab === 'krs'"> <TableKrs /> </div>
-
-    </main>
-
-    <Footer />
+    </div>
   </div>
 </template>
+
+<style>
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+</style>
