@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue';
-import Login from './components/Login.vue'; // <-- Import Login
+import Login from './components/Login.vue';
 import Sidebar from './components/Sidebar.vue';
 import Home from './components/Home.vue';
 import TableMahasiswa from './components/TableMahasiswa.vue';
@@ -8,29 +8,32 @@ import TableJurusan from './components/TableJurusan.vue';
 import TableMatakuliah from './components/TableMatakuliah.vue';
 import TableKrs from './components/TableKrs.vue';
 
-// --- STATE AUTHENTICATION ---
+// --- STATE AUTH ---
 const isAuthenticated = ref(false);
+const currentUser = ref(null); // <--- 1. STATE BARU: Data User
 
-// Cek apakah ada token di LocalStorage saat aplikasi dibuka
 const checkAuth = () => {
     const token = localStorage.getItem('token');
-    if (token) {
+    const userStr = localStorage.getItem('user'); // Ambil string JSON user
+
+    if (token && userStr) {
         isAuthenticated.value = true;
+        // 2. Parse JSON string jadi Objek agar bisa dipakai
+        currentUser.value = JSON.parse(userStr); 
     }
 };
 
-// Fungsi Logout (Hapus token & reset state)
 const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     isAuthenticated.value = false;
-    activeTab.value = 'home'; // Reset tab ke home
+    currentUser.value = null; // Reset user
+    activeTab.value = 'home';
 };
 
-// --- STATE DASHBOARD ---
+// ... State dashboard & sidebar tetap sama ...
 const activeTab = ref('home');
-const isSidebarOpen = ref(true); // Default sidebar terbuka di desktop
-
+const isSidebarOpen = ref(true);
 const toggleSidebar = () => { isSidebarOpen.value = !isSidebarOpen.value; };
 const handleTabChange = (tabId) => {
     activeTab.value = tabId;
@@ -38,25 +41,22 @@ const handleTabChange = (tabId) => {
     if (window.innerWidth < 768) isSidebarOpen.value = false; 
 };
 
-// Jalankan pengecekan saat start
 onMounted(() => {
     checkAuth();
 });
 </script>
 
 <template>
-  
   <div v-if="!isAuthenticated">
       <Login @loginSuccess="checkAuth" />
   </div>
 
   <div v-else class="flex h-screen bg-gray-50 font-sans text-gray-900 overflow-hidden">
     
-    <div v-if="isSidebarOpen" @click="isSidebarOpen = false" class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden transition-opacity"></div>
-
     <Sidebar 
         :activeTab="activeTab" 
         :isOpen="isSidebarOpen" 
+        :user="currentUser"  
         @changeTab="handleTabChange" 
         @triggerLogout="handleLogout"
     />
@@ -76,7 +76,9 @@ onMounted(() => {
         <div class="flex items-center space-x-4">
            <div class="flex items-center gap-2">
                <div class="text-right hidden sm:block">
-                   <p class="text-sm font-bold text-gray-700">Admin</p>
+                   <p class="text-sm font-bold text-gray-700">
+                       {{ currentUser?.nama || 'Admin' }}
+                   </p>
                    <p class="text-xs text-green-500">Online</p>
                </div>
                <div class="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600">
@@ -98,15 +100,10 @@ onMounted(() => {
         </transition>
       </main>
 
-      <footer class="bg-white border-t p-4 text-center text-xs text-gray-400">
+       <footer class="bg-white border-t p-4 text-center text-xs text-gray-400">
         &copy; 2025 SIAKAD Mini. Built with Vue 3.
       </footer>
 
     </div>
   </div>
 </template>
-
-<style>
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-</style>

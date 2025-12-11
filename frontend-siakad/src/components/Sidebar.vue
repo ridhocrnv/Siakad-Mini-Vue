@@ -1,8 +1,8 @@
 <script setup>
 import { defineProps, defineEmits } from 'vue';
 
-// Terima props isOpen dari App.vue
-const props = defineProps(['activeTab', 'isOpen']);
+// 1. TERIMA PROPS 'user'
+const props = defineProps(['activeTab', 'isOpen', 'user']);
 const emit = defineEmits(['changeTab', 'triggerLogout']);
 
 const menuItems = [
@@ -15,9 +15,8 @@ const menuItems = [
 
 const selectTab = (id) => { emit('changeTab', id); };
 
-// Fungsi Logout Baru
 const logout = () => {
-    if(confirm("Yakin ingin keluar dari sistem?")) {
+    if(confirm("Yakin ingin keluar?")) {
         emit('triggerLogout');
     }
 };
@@ -35,12 +34,16 @@ const logout = () => {
     </div>
 
     <div class="p-6 flex items-center border-b border-slate-800 bg-slate-900">
-      <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-lg">
-        A
+      <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-lg uppercase">
+        {{ user?.nama ? user.nama.charAt(0) : 'A' }}
       </div>
-      <div class="ml-3">
-        <p class="text-sm font-semibold">Admin Kampus</p>
-        <p class="text-xs text-slate-400">Online</p>
+      <div class="ml-3 overflow-hidden">
+        <p class="text-sm font-semibold truncate w-32">
+            {{ user?.nama || 'Pengguna' }}
+        </p>
+        <p class="text-xs text-slate-400">
+            @{{ user?.username || 'user' }}
+        </p>
       </div>
     </div>
 
@@ -64,7 +67,10 @@ const logout = () => {
     </nav>
 
     <div class="p-4 border-t border-slate-800">
-      <button @click="logout" class="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded transition">
+      <button 
+        @click="logout" 
+        class="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded transition"
+      >
         <i class="fas fa-sign-out-alt w-6"></i>
         <span>Logout</span>
       </button>
