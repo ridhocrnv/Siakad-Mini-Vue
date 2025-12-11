@@ -1,10 +1,9 @@
 <script setup>
-import { ref, onMounted, reactive, computed } from 'vue';
+import { ref, onMounted, reactive, computed, watch } from 'vue'; // Tambah 'watch'
 import axios from 'axios';
 import html2pdf from 'html2pdf.js';
 import { showToast, confirmDialog, showAlert } from '../utils/swal';
 
-// --- STATE ---
 const listKrs = ref([]);
 const listMahasiswa = ref([]);
 const listMatakuliah = ref([]);
@@ -13,107 +12,98 @@ const showModal = ref(false);
 const isSubmitting = ref(false);
 const editId = ref(null);
 
-// FILTER STATE
-const selectedMahasiswaId = ref(''); // Filter Mahasiswa (Wajib pilih untuk lihat IPK)
-const selectedSemesterFilter = ref(''); // Filter Semester (Untuk lihat IPS)
+// FILTER
+const selectedMahasiswaId = ref('');
+const selectedSemesterFilter = ref('');
 
 const form = reactive({
     id_mahasiswa: '',
     id_matakuliah: '',
     semester: '20242',
-    nilai_angka: 0,
-    nilai_huruf: ''
+    // KOMPONEN NILAI BARU
+    nilai_tugas: 0,
+    nilai_uts: 0,
+    nilai_uas: 0,
+    total_nilai: 0, // Skala 0-100
+    nilai_angka: 0, // Bobot 4.0 (Otomatis)
+    nilai_huruf: 'E' // Grade (Otomatis)
 });
 
-// --- COMPUTED LOGIC (THE BRAIN) ---
+// --- RUMUS OTOMATIS (THE MAGIC) ---
+// Kita pantau perubahan pada Tugas, UTS, UAS
+watch(
+    () => [form.nilai_tugas, form.nilai_uts, form.nilai_uas],
+    ([tugas, uts, uas]) => {
+        // 1. Hitung Total Nilai (Bobot: Tugas 30%, UTS 35%, UAS 35%)
+        const total = (Number(tugas) * 0.3) + (Number(uts) * 0.35) + (Number(uas) * 0.35);
+        form.total_nilai = total.toFixed(2);
 
-// 1. Ambil list semester unik dari data KRS mahasiswa yang dipilih
+        // 2. Tentukan Grade & Bobot IPK
+        if (total >= 80) { form.nilai_huruf = 'A'; form.nilai_angka = 4.0; }
+        else if (total >= 75) { form.nilai_huruf = 'B+'; form.nilai_angka = 3.5; }
+        else if (total >= 70) { form.nilai_huruf = 'B'; form.nilai_angka = 3.0; }
+        else if (total >= 60) { form.nilai_huruf = 'C+'; form.nilai_angka = 2.5; }
+        else if (total >= 50) { form.nilai_huruf = 'C'; form.nilai_angka = 2.0; }
+        else if (total >= 40) { form.nilai_huruf = 'D'; form.nilai_angka = 1.0; }
+        else { form.nilai_huruf = 'E'; form.nilai_angka = 0.0; }
+    }
+);
+
+// --- COMPUTED ---
 const availableSemesters = computed(() => {
     if (!selectedMahasiswaId.value) return [];
-    // Filter KRS milik mahasiswa ini saja
     const studentKrs = listKrs.value.filter(k => k.id_mahasiswa == selectedMahasiswaId.value);
-    // Ambil semesternya, unikkan, dan urutkan descending
     const sems = studentKrs.map(k => k.semester);
     return [...new Set(sems)].sort((a,b) => b - a);
 });
 
-// 2. Filter Tabel Utama
 const filteredKrs = computed(() => {
     return listKrs.value.filter(item => {
-        // Filter Mahasiswa
         const matchMhs = !selectedMahasiswaId.value || item.id_mahasiswa == selectedMahasiswaId.value;
-        
-        // Filter Semester (Hanya jika mahasiswa dipilih & semester dipilih)
         const matchSem = !selectedSemesterFilter.value || item.semester == selectedSemesterFilter.value;
-        
         return matchMhs && matchSem;
     });
 });
 
-// 3. Detail Mahasiswa Aktif
-const activeStudent = computed(() => {
-    return listMahasiswa.value.find(m => m.id == selectedMahasiswaId.value);
-});
-
+const activeStudent = computed(() => listMahasiswa.value.find(m => m.id == selectedMahasiswaId.value));
 const activeStudentDetails = computed(() => {
     if (filteredKrs.value.length > 0) return filteredKrs.value[0];
-    // Fallback: Cari di listKrs global jika filtered kosong tapi mahasiswa terpilih
-    if (selectedMahasiswaId.value) {
-        return listKrs.value.find(k => k.id_mahasiswa == selectedMahasiswaId.value);
-    }
+    if (selectedMahasiswaId.value) return listKrs.value.find(k => k.id_mahasiswa == selectedMahasiswaId.value);
     return null;
 });
 
-// 4. HITUNG IPS (Indeks Prestasi Semester)
-// Berdasarkan data yang sedang TAMPIL di tabel (filteredKrs)
+// Hitung IPK/IPS pakai 'nilai_angka' (Bobot 4.0)
 const hitungIPS = computed(() => {
     if (!selectedMahasiswaId.value || !selectedSemesterFilter.value) return "0.00";
-    
-    let totalSks = 0;
-    let totalMutu = 0; // SKS * Nilai Angka
-
+    let totalSks = 0, totalMutu = 0;
     filteredKrs.value.forEach(krs => {
         const sks = Number(krs.sks || 0);
-        const nilai = Number(krs.nilai_angka || 0);
+        const bobot = Number(krs.nilai_angka || 0); // Pakai Bobot 4.0
         totalSks += sks;
-        totalMutu += (sks * nilai);
+        totalMutu += (sks * bobot);
     });
-
-    if (totalSks === 0) return "0.00";
-    return (totalMutu / totalSks).toFixed(2);
+    return totalSks === 0 ? "0.00" : (totalMutu / totalSks).toFixed(2);
 });
 
-// 5. HITUNG IPK (Indeks Prestasi Kumulatif)
-// Berdasarkan SEMUA data KRS mahasiswa tersebut (abaikan filter semester)
 const hitungIPK = computed(() => {
     if (!selectedMahasiswaId.value) return "0.00";
-
-    // Ambil semua KRS milik mahasiswa ini
     const allKrsMhs = listKrs.value.filter(k => k.id_mahasiswa == selectedMahasiswaId.value);
-    
-    let totalSks = 0;
-    let totalMutu = 0;
-
+    let totalSks = 0, totalMutu = 0;
     allKrsMhs.forEach(krs => {
         const sks = Number(krs.sks || 0);
-        const nilai = Number(krs.nilai_angka || 0);
+        const bobot = Number(krs.nilai_angka || 0);
         totalSks += sks;
-        totalMutu += (sks * nilai);
+        totalMutu += (sks * bobot);
     });
-
-    if (totalSks === 0) return "0.00";
-    return (totalMutu / totalSks).toFixed(2);
+    return totalSks === 0 ? "0.00" : (totalMutu / totalSks).toFixed(2);
 });
-
 
 // --- ACTIONS ---
 const fetchKrs = async () => {
-    isLoading.value = true;
     try {
         const response = await axios.get('http://localhost:3000/api/krs');
         if(response.data.success) listKrs.value = response.data.data;
-    } catch (e) { console.error(e); } 
-    finally { isLoading.value = false; }
+    } catch (e) { console.error(e); }
 };
 const fetchMahasiswa = async () => {
     try {
@@ -133,23 +123,23 @@ const simpanData = async () => {
         isSubmitting.value = true;
         if (editId.value) {
             await axios.put(`http://localhost:3000/api/krs/${editId.value}`, form);
-            showToast('KRS Update!');
+            showToast('Nilai Updated!');
         } else {
             await axios.post('http://localhost:3000/api/krs', form);
-            showToast('KRS Tersimpan!');
+            showToast('Nilai Tersimpan!');
         }
         tutupModal();
         fetchKrs();
-    } catch (error) { showAlert('Gagal', 'Gagal menyimpan data', 'error'); } 
+    } catch (error) { showAlert('Error', 'Gagal simpan data', 'error'); } 
     finally { isSubmitting.value = false; }
 };
 
 const hapusData = async (id) => {
-    const yakin = await confirmDialog('Hapus KRS?', 'Data ini akan dihapus.');
+    const yakin = await confirmDialog('Hapus KRS?', 'Data akan hilang.');
     if(yakin) {
         try {
             await axios.delete(`http://localhost:3000/api/krs/${id}`);
-            showToast('KRS Dihapus');
+            showToast('Terhapus!');
             fetchKrs();
         } catch (e) { showAlert('Error', 'Gagal hapus', 'error'); }
     }
@@ -159,7 +149,7 @@ const cetakPdf = () => {
     const element = document.getElementById('area-cetak');
     const opt = {
         margin: 1,
-        filename: `KRS_${activeStudent.value?.nim}.pdf`,
+        filename: `KHS_${activeStudent.value?.nim}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2 },
         jsPDF: { unit: 'cm', format: 'a4', orientation: 'portrait' }
@@ -167,212 +157,195 @@ const cetakPdf = () => {
     html2pdf().set(opt).from(element).save();
 };
 
-// --- MODAL & FORM ---
+// --- MODAL ---
 const bukaModalTambah = () => {
     editId.value = null;
     form.id_mahasiswa = selectedMahasiswaId.value || ''; 
-    form.id_matakuliah = '';
-    form.semester = selectedSemesterFilter.value || '20242'; // Auto isi semester yg dipilih
-    form.nilai_angka = 0; form.nilai_huruf = 'E';
+    form.id_matakuliah = ''; form.semester = selectedSemesterFilter.value || '20242';
+    // Reset Nilai
+    form.nilai_tugas = 0; form.nilai_uts = 0; form.nilai_uas = 0;
+    form.total_nilai = 0; form.nilai_angka = 0; form.nilai_huruf = 'E';
     showModal.value = true;
 };
 
 const bukaModalEdit = (item) => {
     editId.value = item.id;
     form.id_mahasiswa = item.id_mahasiswa; form.id_matakuliah = item.id_matakuliah;
-    form.semester = item.semester; form.nilai_angka = item.nilai_angka;
-    form.nilai_huruf = item.nilai_huruf;
+    form.semester = item.semester; 
+    // Load Nilai Lama
+    form.nilai_tugas = item.nilai_tugas || 0;
+    form.nilai_uts = item.nilai_uts || 0;
+    form.nilai_uas = item.nilai_uas || 0;
+    // Pemicu watch agar hitung ulang (total & grade)
+    form.total_nilai = item.total_nilai || 0;
+    form.nilai_angka = item.nilai_angka || 0;
+    form.nilai_huruf = item.nilai_huruf || 'E';
+    
     showModal.value = true;
 };
 const tutupModal = () => { showModal.value = false; };
 
-// Auto fill Nilai Angka saat Nilai Huruf berubah
-const updateNilaiAngka = () => {
-    const map = { 'A': 4, 'B': 3, 'C': 2, 'D': 1, 'E': 0 };
-    form.nilai_angka = map[form.nilai_huruf] || 0;
-};
-
-onMounted(() => {
-    fetchKrs(); fetchMahasiswa(); fetchMatakuliah();
-});
+onMounted(() => { fetchKrs(); fetchMahasiswa(); fetchMatakuliah(); });
 </script>
 
 <template>
     <div>
         <div class="bg-white p-6 rounded-lg shadow-md">
             
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4 border-b pb-4">
-                
+            <div class="flex flex-col md:flex-row justify-between mb-6 gap-4 border-b pb-4">
                 <div class="flex flex-col md:flex-row gap-4 w-full md:w-2/3">
                     <div class="w-full md:w-1/2">
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pilih Mahasiswa (Lihat Nilai)</label>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pilih Mahasiswa</label>
                         <select v-model="selectedMahasiswaId" @change="selectedSemesterFilter = ''" class="border rounded px-3 py-2 w-full focus:ring-2 focus:ring-indigo-500 bg-white">
                             <option value="">-- Cari Mahasiswa --</option>
-                            <option v-for="mhs in listMahasiswa" :key="mhs.id" :value="mhs.id">
-                                {{ mhs.nim }} - {{ mhs.nama_lengkap }}
-                            </option>
+                            <option v-for="mhs in listMahasiswa" :key="mhs.id" :value="mhs.id">{{ mhs.nim }} - {{ mhs.nama_lengkap }}</option>
                         </select>
                     </div>
-
                     <div class="w-full md:w-1/2" v-if="selectedMahasiswaId">
-                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Pilih Semester</label>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Filter Semester</label>
                         <select v-model="selectedSemesterFilter" class="border rounded px-3 py-2 w-full focus:ring-2 focus:ring-indigo-500 bg-white">
-                            <option value="">-- Semua Semester (Transkrip) --</option>
+                            <option value="">-- Transkrip Nilai (Semua) --</option>
                             <option v-for="sem in availableSemesters" :key="sem" :value="sem">Semester {{ sem }}</option>
                         </select>
                     </div>
                 </div>
-
-                <div class="flex gap-2">
-                    <button v-if="selectedMahasiswaId && filteredKrs.length > 0" @click="cetakPdf" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 shadow transition">
-                        <i class="fas fa-print"></i> PDF
-                    </button>
-                    <button @click="bukaModalTambah" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md text-sm flex items-center gap-2 transition">
-                        <i class="fas fa-plus"></i> Input KRS
-                    </button>
+                <div class="flex gap-2 items-end">
+                    <button v-if="selectedMahasiswaId && filteredKrs.length > 0" @click="cetakPdf" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md shadow"><i class="fas fa-print"></i> PDF</button>
+                    <button @click="bukaModalTambah" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-md shadow"><i class="fas fa-plus"></i> Input Nilai</button>
                 </div>
             </div>
 
             <div v-if="selectedMahasiswaId" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                    <p class="text-xs text-indigo-500 font-bold uppercase">IPS (Smt {{ selectedSemesterFilter || 'Semua' }})</p>
+                    <p class="text-xs text-indigo-500 font-bold uppercase">IPS</p>
                     <p class="text-2xl font-extrabold text-indigo-700">{{ hitungIPS }}</p>
                 </div>
                 <div class="bg-green-50 p-4 rounded-lg border border-green-100">
-                    <p class="text-xs text-green-500 font-bold uppercase">IPK (Kumulatif)</p>
+                    <p class="text-xs text-green-500 font-bold uppercase">IPK</p>
                     <p class="text-2xl font-extrabold text-green-700">{{ hitungIPK }}</p>
                 </div>
             </div>
 
             <div id="area-cetak" class="bg-white p-2">
-                
                 <div v-if="selectedMahasiswaId" class="mb-6 border-b-2 border-black pb-4">
                     <div class="text-center">
                         <h1 class="text-xl font-bold uppercase">Universitas Halu Oleo</h1>
-                        <h2 class="text-lg font-semibold">
-                            {{ selectedSemesterFilter ? 'Kartu Hasil Studi (KHS)' : 'Transkrip Nilai Sementara' }}
-                        </h2>
-                        <p class="text-sm text-gray-600" v-if="selectedSemesterFilter">Semester {{ selectedSemesterFilter }}</p>
+                        <h2 class="text-lg font-semibold">{{ selectedSemesterFilter ? 'Kartu Hasil Studi (KHS)' : 'Transkrip Akademik' }}</h2>
                     </div>
-                    
-                    <div class="mt-6 flex justify-between text-sm">
-                        <div v-if="activeStudent">
-                            <p><strong>NIM:</strong> {{ activeStudent.nim }}</p>
-                            <p><strong>Nama:</strong> {{ activeStudent.nama_lengkap }}</p>
-                            <p><strong>Jurusan:</strong> {{ activeStudentDetails?.nama_jurusan || '-' }}</p>
+                    <div class="mt-4 text-sm grid grid-cols-2 gap-x-8">
+                        <div>
+                            <p><span class="w-24 inline-block font-bold">NIM</span>: {{ activeStudent.nim }}</p>
+                            <p><span class="w-24 inline-block font-bold">Nama</span>: {{ activeStudent.nama_lengkap }}</p>
                         </div>
-                        <div v-if="activeStudentDetails">
-                            <p><strong>Fakultas:</strong> {{ activeStudentDetails.fakultas }}</p>
-                            <p><strong>Jenjang:</strong> {{ activeStudentDetails.jenjang }}</p>
+                        <div>
+                            <p><span class="w-24 inline-block font-bold">Jurusan</span>: {{ activeStudentDetails?.nama_jurusan || '-' }}</p>
+                            <p><span class="w-24 inline-block font-bold">Fakultas</span>: {{ activeStudentDetails?.fakultas || '-' }}</p>
                         </div>
                     </div>
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full border-collapse border border-gray-400">
+                    <table class="min-w-full border-collapse border border-gray-400 text-sm">
                         <thead class="bg-gray-100">
                             <tr>
-                                <th class="border border-gray-400 px-4 py-2 text-center text-xs font-bold uppercase">No</th>
-                                <th class="border border-gray-400 px-4 py-2 text-center text-xs font-bold uppercase">Semester</th>
-                                <th class="border border-gray-400 px-4 py-2 text-left text-xs font-bold uppercase">Kode MK</th>
-                                <th class="border border-gray-400 px-4 py-2 text-left text-xs font-bold uppercase">Matakuliah</th>
-                                <th class="border border-gray-400 px-4 py-2 text-center text-xs font-bold uppercase">SKS</th>
-                                <th class="border border-gray-400 px-4 py-2 text-center text-xs font-bold uppercase">Nilai</th>
-                                <th class="border border-gray-400 px-4 py-2 text-center text-xs font-bold uppercase" data-html2canvas-ignore="true">Aksi</th>
+                                <th class="border border-gray-400 px-2 py-2 w-10">No</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16">Smt</th>
+                                <th class="border border-gray-400 px-2 py-2">Matakuliah</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">SKS</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">Tugas</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">UTS</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16 text-center">UAS</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16 text-center bg-gray-50">Total</th>
+                                <th class="border border-gray-400 px-2 py-2 w-16 text-center font-bold bg-yellow-50">Huruf</th>
+                                <th class="border border-gray-400 px-2 py-2 w-20 text-center" data-html2canvas-ignore="true">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-if="filteredKrs.length === 0">
-                                <td colspan="7" class="text-center p-4 text-gray-500 border border-gray-400">Data tidak ditemukan.</td>
-                            </tr>
-
-                            <tr v-for="(item, index) in filteredKrs" :key="item.id">
-                                <td class="border border-gray-400 px-4 py-2 text-center text-sm">{{ index + 1 }}</td>
-                                <td class="border border-gray-400 px-4 py-2 text-center text-sm">{{ item.semester }}</td>
-                                <td class="border border-gray-400 px-4 py-2 text-sm">{{ item.kode_mk }}</td>
-                                <td class="border border-gray-400 px-4 py-2 text-sm">{{ item.nama_mk }}</td>
-                                <td class="border border-gray-400 px-4 py-2 text-center text-sm">{{ item.sks }}</td>
-                                <td class="border border-gray-400 px-4 py-2 text-center text-sm font-bold">{{ item.nilai_huruf }}</td>
-                                
-                                <td class="border border-gray-400 px-4 py-2 text-center" data-html2canvas-ignore="true">
-                                    <button @click="bukaModalEdit(item)" class="text-indigo-600 hover:text-indigo-900 mr-2"><i class="fas fa-edit"></i></button>
-                                    <button @click="hapusData(item.id)" class="text-red-600 hover:text-red-900"><i class="fas fa-trash-alt"></i></button>
-                                </td>
-                            </tr>
+                            <tr v-if="filteredKrs.length === 0"><td colspan="10" class="text-center p-4 text-gray-500 border border-gray-400">Belum ada data nilai.</td></tr>
                             
-                            <tr v-if="selectedMahasiswaId">
-                                <td colspan="4" class="border border-gray-400 px-4 py-2 text-right font-bold">Total SKS</td>
-                                <td class="border border-gray-400 px-4 py-2 text-center font-bold">
-                                    {{ filteredKrs.reduce((sum, item) => sum + (item.sks || 0), 0) }}
+                            <tr v-for="(item, index) in filteredKrs" :key="item.id">
+                                <td class="border border-gray-400 px-2 py-2 text-center">{{ index + 1 }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center">{{ item.semester }}</td>
+                                <td class="border border-gray-400 px-2 py-2">
+                                    <span class="font-bold block">{{ item.kode_mk }}</span>
+                                    {{ item.nama_mk }}
                                 </td>
-                                <td colspan="2" class="border border-gray-400"></td>
+                                <td class="border border-gray-400 px-2 py-2 text-center">{{ item.sks }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_tugas }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_uts }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center text-gray-500">{{ item.nilai_uas }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center font-bold bg-gray-50">{{ item.total_nilai }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center font-extrabold bg-yellow-50">{{ item.nilai_huruf }}</td>
+                                <td class="border border-gray-400 px-2 py-2 text-center" data-html2canvas-ignore="true">
+                                    <button @click="bukaModalEdit(item)" class="text-indigo-600 mr-2"><i class="fas fa-edit"></i></button>
+                                    <button @click="hapusData(item.id)" class="text-red-600"><i class="fas fa-trash-alt"></i></button>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-
-                <div v-if="selectedMahasiswaId" class="mt-10 flex justify-end">
-                    <div class="text-center w-64">
-                        <p class="text-sm">Kendari, {{ new Date().toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) }}</p>
-                        <p class="text-sm mb-16">Mengetahui, Dosen Wali</p>
-                        <p class="text-sm font-bold border-b border-black inline-block">Ridho Ahmad Irawan, S.Kom., M.Cs.</p>
-                        <p class="text-xs">NIP. 199920202021</p>
-                    </div>
-                </div>
-
             </div>
         </div>
 
         <div v-if="showModal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 backdrop-blur-sm">
-            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md h-auto max-h-[90vh] overflow-y-auto">
-                <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">{{ editId ? 'Edit Nilai' : 'Input Nilai' }}</h2>
+            <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-lg">
+                <h2 class="text-2xl font-bold mb-6 text-gray-800 border-b pb-2">Input Komponen Nilai</h2>
                 <form @submit.prevent="simpanData">
                     
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Mahasiswa</label>
-                        <select v-model="form.id_mahasiswa" class="border rounded w-full py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                            <option value="">-- Pilih Mahasiswa --</option>
-                            <option v-for="mhs in listMahasiswa" :key="mhs.id" :value="mhs.id">
-                                {{ mhs.nim }} - {{ mhs.nama_lengkap }}
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Matakuliah</label>
-                        <select v-model="form.id_matakuliah" class="border rounded w-full py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                            <option value="">-- Pilih Matakuliah --</option>
-                            <option v-for="mk in listMatakuliah" :key="mk.id" :value="mk.id">
-                                [Sem {{ mk.semester }}] {{ mk.kode_mk }} - {{ mk.nama_mk }} ({{ mk.sks }} SKS)
-                            </option>
-                        </select>
-                    </div>
-
-                    <div class="mb-4">
-                        <label class="block text-gray-700 text-sm font-bold mb-2">Semester Akademik</label>
-                        <input v-model="form.semester" type="text" class="border rounded w-full py-2 px-3" placeholder="Contoh: 20242" required>
-                    </div>
-
-                    <div class="flex gap-4 mb-6">
-                        <div class="w-1/2">
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Nilai Huruf</label>
-                            <select v-model="form.nilai_huruf" @change="updateNilaiAngka" class="border rounded w-full py-2 px-3 focus:ring-2 focus:ring-indigo-500 outline-none" required>
-                                <option value="A">A (4.0)</option>
-                                <option value="B">B (3.0)</option>
-                                <option value="C">C (2.0)</option>
-                                <option value="D">D (1.0)</option>
-                                <option value="E">E (0.0)</option>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Mahasiswa</label>
+                            <select v-model="form.id_mahasiswa" class="border rounded w-full py-2 px-3 bg-gray-50" required :disabled="editId">
+                                <option value="">Pilih Mahasiswa</option>
+                                <option v-for="mhs in listMahasiswa" :key="mhs.id" :value="mhs.id">{{ mhs.nim }} - {{ mhs.nama_lengkap }}</option>
                             </select>
                         </div>
-                        <div class="w-1/2">
-                            <label class="block text-gray-700 text-sm font-bold mb-2">Bobot</label>
-                            <input v-model="form.nilai_angka" type="number" step="0.01" class="border rounded w-full py-2 px-3 bg-gray-100" readonly>
+                        <div class="col-span-2">
+                            <label class="block text-xs font-bold text-gray-500 uppercase">Matakuliah</label>
+                            <select v-model="form.id_matakuliah" class="border rounded w-full py-2 px-3" required>
+                                <option value="">Pilih MK</option>
+                                <option v-for="mk in listMatakuliah" :key="mk.id" :value="mk.id">[Smt {{ mk.semester }}] {{ mk.nama_mk }} ({{ mk.sks }} SKS)</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div class="flex justify-end space-x-2 pt-4 border-t">
-                        <button type="button" @click="tutupModal" class="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Batal</button>
-                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 font-bold shadow-md">Simpan</button>
+                    <div class="mb-4">
+                        <label class="block text-xs font-bold text-gray-500 uppercase">Semester</label>
+                        <input v-model="form.semester" type="text" class="border rounded w-full py-2 px-3" placeholder="20242">
+                    </div>
+
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6">
+                        <h3 class="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Rincian Nilai (0-100)</h3>
+                        <div class="grid grid-cols-3 gap-3">
+                            <div>
+                                <label class="block text-xs text-gray-500">Tugas (30%)</label>
+                                <input v-model="form.nilai_tugas" type="number" min="0" max="100" class="border rounded w-full py-1 px-2 text-center focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500">UTS (35%)</label>
+                                <input v-model="form.nilai_uts" type="number" min="0" max="100" class="border rounded w-full py-1 px-2 text-center focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500">UAS (35%)</label>
+                                <input v-model="form.nilai_uas" type="number" min="0" max="100" class="border rounded w-full py-1 px-2 text-center focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                        
+                        <div class="mt-4 flex justify-between items-center bg-white p-2 rounded border">
+                            <div>
+                                <p class="text-xs text-gray-500">Total Nilai</p>
+                                <p class="text-lg font-bold">{{ form.total_nilai }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-500">Grade / Bobot</p>
+                                <p class="text-lg font-bold text-indigo-600">{{ form.nilai_huruf }} / {{ form.nilai_angka }}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-end space-x-2">
+                        <button type="button" @click="tutupModal" class="px-4 py-2 bg-gray-200 rounded">Batal</button>
+                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded font-bold">Simpan Nilai</button>
                     </div>
                 </form>
             </div>
