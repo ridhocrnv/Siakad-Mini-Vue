@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 const stats = ref({
-    mahasiswa: 0, fakultas:0, jurusan: 0, matakuliah: 0, krs: 0
+    mahasiswa: 0, jurusan: 0, fakultas: 0, matakuliah: 0, krs: 0
 });
 const isLoading = ref(true);
 
@@ -11,7 +11,7 @@ const fetchStats = async () => {
     try {
         const response = await axios.get('http://localhost:3000/api/dashboard');
         if (response.data.success) stats.value = response.data.data;
-    } catch (error) { console.error(error); } 
+    } catch (error) { console.error(error); }
     finally { isLoading.value = false; }
 };
 
@@ -20,7 +20,8 @@ onMounted(() => fetchStats());
 
 <template>
     <div class="space-y-6">
-        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-8 text-white flex justify-between items-center">
+        <div
+            class="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-lg p-8 text-white flex justify-between items-center">
             <div>
                 <h2 class="text-3xl font-bold mb-2">Halo, Admin! 👋</h2>
                 <p class="opacity-90">Selamat datang kembali di Dashboard SIAKAD Mini.</p>
@@ -37,16 +38,20 @@ onMounted(() => fetchStats());
                         <p class="text-xs font-bold text-gray-400 uppercase">Mahasiswa</p>
                         <h3 class="text-3xl font-extrabold text-gray-800 mt-2">{{ stats.mahasiswa }}</h3>
                     </div>
-                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
+                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600"><i class="fas fa-user-graduate text-xl"></i>
+                    </div>
                 </div>
             </div>
-            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+            <div
+                class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition duration-300">
                 <div class="flex justify-between items-start">
                     <div>
-                        <p class="text-xs font-bold text-gray-400 uppercase">Fakultas</p>
+                        <p class="text-xs font-bold text-gray-400 uppercase tracking-wider">Fakultas</p>
                         <h3 class="text-3xl font-extrabold text-gray-800 mt-2">{{ stats.fakultas }}</h3>
                     </div>
-                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
+                    <div class="p-3 bg-orange-50 rounded-lg text-orange-600">
+                        <i class="fas fa-building text-xl"></i>
+                    </div>
                 </div>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
@@ -55,7 +60,8 @@ onMounted(() => fetchStats());
                         <p class="text-xs font-bold text-gray-400 uppercase">Jurusan</p>
                         <h3 class="text-3xl font-extrabold text-gray-800 mt-2">{{ stats.jurusan }}</h3>
                     </div>
-                    <div class="p-3 bg-green-50 rounded-lg text-green-600"><i class="fas fa-university text-xl"></i></div>
+                    <div class="p-3 bg-green-50 rounded-lg text-green-600"><i class="fas fa-university text-xl"></i>
+                    </div>
                 </div>
             </div>
             <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
@@ -73,7 +79,8 @@ onMounted(() => fetchStats());
                         <p class="text-xs font-bold text-gray-400 uppercase">KRS Terisi</p>
                         <h3 class="text-3xl font-extrabold text-gray-800 mt-2">{{ stats.krs }}</h3>
                     </div>
-                    <div class="p-3 bg-purple-50 rounded-lg text-purple-600"><i class="fas fa-file-signature text-xl"></i></div>
+                    <div class="p-3 bg-purple-50 rounded-lg text-purple-600"><i
+                            class="fas fa-file-signature text-xl"></i></div>
                 </div>
             </div>
         </div>
