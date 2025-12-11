@@ -1,7 +1,8 @@
 <script setup>
 import { defineProps, defineEmits } from 'vue';
 
-const props = defineProps(['activeTab']);
+// Terima props isOpen dari App.vue
+const props = defineProps(['activeTab', 'isOpen']);
 const emit = defineEmits(['changeTab']);
 
 const menuItems = [
@@ -18,7 +19,10 @@ const selectTab = (id) => {
 </script>
 
 <template>
-  <aside class="w-64 bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 shadow-xl z-50">
+  <aside 
+    class="w-64 bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 shadow-xl z-50 transition-transform duration-300 ease-in-out"
+    :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
+  >
     
     <div class="h-16 flex items-center justify-center border-b border-slate-700 bg-slate-950">
       <i class="fas fa-graduation-cap text-indigo-500 text-2xl mr-3"></i>
