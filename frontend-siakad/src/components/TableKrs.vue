@@ -122,32 +122,49 @@ const calculateGPA = (dataSet) => {
 const hitungIPS = computed(() => calculateGPA(displayedKrs.value));
 const hitungIPK = computed(() => calculateGPA(studentKrsData.value));
 
-// RUMUS PERHITUNGAN OTOMATIS (Trigger by @input)
+// ==========================================
+// RUMUS PERHITUNGAN NILAI (STANDAR UHO)
+// ==========================================
 const hitungNilaiOtomatis = () => {
+    // 1. Ambil input dan pastikan tipe data angka
     const tugas = parseFloat(form.nilai_tugas) || 0;
     const prak = parseFloat(form.nilai_praktikum) || 0;
     const uts = parseFloat(form.nilai_uts) || 0;
     const uas = parseFloat(form.nilai_uas) || 0;
 
     let total = 0;
-
-    // 1. Hitung Nilai Mentah
+    
+    // 2. Hitung Nilai Mentah Berdasarkan Bobot
     if (form.has_praktikum) {
+        // Bobot: Tugas 20%, Prak 20%, UTS 30%, UAS 30%
         total = (tugas * 0.20) + (prak * 0.20) + (uts * 0.30) + (uas * 0.30);
     } else {
+        // Bobot: Tugas 30%, UTS 35%, UAS 35%
         total = (tugas * 0.30) + (uts * 0.35) + (uas * 0.35);
     }
 
-    // 2. PEMBULATAN (Rounding)
+    // 3. PEMBULATAN (Rounding)
+    // Contoh: 80.5 jadi 81, 80.4 jadi 80
     const totalBulat = Math.round(total);
     form.total_nilai = parseFloat(totalBulat).toFixed(2);
 
-    // 3. KONVERSI GRADE (A, B, C, D, E)
-    if (totalBulat >= 80) { form.nilai_huruf = 'A'; form.nilai_angka = 4.0; }
-    else if (totalBulat >= 70) { form.nilai_huruf = 'B'; form.nilai_angka = 3.0; }
-    else if (totalBulat >= 60) { form.nilai_huruf = 'C'; form.nilai_angka = 2.0; }
-    else if (totalBulat >= 50) { form.nilai_huruf = 'D'; form.nilai_angka = 1.0; }
-    else { form.nilai_huruf = 'E'; form.nilai_angka = 0.0; }
+    // 4. KONVERSI GRADE & BOBOT (Peraturan Rektor UHO)
+    if (totalBulat >= 81) { 
+        form.nilai_huruf = 'A'; 
+        form.nilai_angka = 4.0; // Sangat Baik
+    } else if (totalBulat >= 66) { 
+        form.nilai_huruf = 'B'; 
+        form.nilai_angka = 3.0; // Baik
+    } else if (totalBulat >= 51) { 
+        form.nilai_huruf = 'C'; 
+        form.nilai_angka = 2.0; // Cukup
+    } else if (totalBulat >= 36) { 
+        form.nilai_huruf = 'D'; 
+        form.nilai_angka = 1.0; // Kurang
+    } else { 
+        form.nilai_huruf = 'E'; 
+        form.nilai_angka = 0.0; // Sangat Kurang
+    }
 };
 
 // ==========================================
