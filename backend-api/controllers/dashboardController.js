@@ -6,8 +6,9 @@ const getDashboardStats = async (req, res) => {
         const queries = [
             db.query('SELECT COUNT(*) as total FROM mahasiswa'),
             db.query('SELECT COUNT(*) as total FROM jurusan'),
+            db.query('SELECT COUNT(DISTINCT fakultas) as total FROM jurusan'),
             db.query('SELECT COUNT(*) as total FROM matakuliah'),
-            db.query('SELECT COUNT(*) as total FROM krs')
+            db.query('SELECT COUNT(*) as total FROM krs'),
         ];
 
         // Tunggu semua query selesai
@@ -17,9 +18,10 @@ const getDashboardStats = async (req, res) => {
         // Struktur result mysql2 itu [[rows], [fields]]
         const stats = {
             mahasiswa: results[0][0][0].total,
-            jurusan: results[1][0][0].total,
-            matakuliah: results[2][0][0].total,
-            krs: results[3][0][0].total
+            fakultas: results[1][0][0].total, 
+            jurusan: results[2][0][0].total,
+            matakuliah: results[3][0][0].total,
+            krs: results[4][0][0].total
         };
 
         res.json({

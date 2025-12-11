@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 const stats = ref({
-    mahasiswa: 0, jurusan: 0, matakuliah: 0, krs: 0
+    mahasiswa: 0, fakultas:0, jurusan: 0, matakuliah: 0, krs: 0
 });
 const isLoading = ref(true);
 
@@ -36,6 +36,15 @@ onMounted(() => fetchStats());
                     <div>
                         <p class="text-xs font-bold text-gray-400 uppercase">Mahasiswa</p>
                         <h3 class="text-3xl font-extrabold text-gray-800 mt-2">{{ stats.mahasiswa }}</h3>
+                    </div>
+                    <div class="p-3 bg-blue-50 rounded-lg text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-xs font-bold text-gray-400 uppercase">Fakultas</p>
+                        <h3 class="text-3xl font-extrabold text-gray-800 mt-2">{{ stats.fakultas }}</h3>
                     </div>
                     <div class="p-3 bg-blue-50 rounded-lg text-blue-600"><i class="fas fa-user-graduate text-xl"></i></div>
                 </div>
