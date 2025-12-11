@@ -77,6 +77,11 @@ const fetchJurusan = async () => {
 };
 
 const simpanData = async () => {
+    // VALIDASI FRONTEND
+    if (form.kode_mk.length < 8 || form.kode_mk.length > 12) {
+        return showAlert('Validasi Gagal', 'Kode MK harus 8-12 karakter!', 'warning');
+    }
+
     try {
         isSubmitting.value = true;
         if (editId.value) {
@@ -89,7 +94,9 @@ const simpanData = async () => {
         tutupModal();
         fetchMatakuliah();
     } catch (error) {
-        showAlert('Error', 'Gagal menyimpan data', 'error');
+        // Tampilkan pesan error dari Backend (misal "Kode MK wajib 8-12 karakter")
+        const msg = error.response?.data?.message || 'Gagal menyimpan data';
+        showAlert('Error', msg, 'error');
     } finally {
         isSubmitting.value = false;
     }
