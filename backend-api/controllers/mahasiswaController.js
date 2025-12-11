@@ -1,9 +1,10 @@
 const db = require('../config/db');
 
-// GET ALL
+// GET ALL (Diperbarui: ORDER BY nim ASC)
 const getAllMahasiswa = async (req, res) => {
     try {
-        const [rows] = await db.query('SELECT * FROM mahasiswa ORDER BY id DESC');
+        // Tambahkan pengurutan berdasarkan NIM secara Ascending (A->Z/Kecil->Besar)
+        const [rows] = await db.query('SELECT * FROM mahasiswa ORDER BY nim ASC');
         res.json({ success: true, data: rows });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
