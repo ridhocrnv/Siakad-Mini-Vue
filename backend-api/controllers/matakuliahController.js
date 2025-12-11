@@ -18,36 +18,54 @@ const getAllMatakuliah = async (req, res) => {
     }
 };
 
-// CREATE (Update: Tambah semester & id_jurusan)
+// CREATE (Update Validasi)
 const createMatakuliah = async (req, res) => {
     try {
         const { kode_mk, nama_mk, sks, semester, id_jurusan } = req.body;
         
-        if (!kode_mk || !nama_mk || !sks || !semester) {
-            return res.status(400).json({ message: "Data wajib diisi" });
+        // 1. VALIDASI PANJANG KODE MK
+        if (!kode_mk || kode_mk.length < 8 || kode_mk.length > 12) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Kode MK wajib 8 - 12 karakter!' 
+            });
         }
 
-        // id_jurusan boleh null (Misal MK Umum)
         const sql = `INSERT INTO matakuliah (kode_mk, nama_mk, sks, semester, id_jurusan) VALUES (?, ?, ?, ?, ?)`;
         await db.query(sql, [kode_mk, nama_mk, sks, semester, id_jurusan || null]);
         
         res.status(201).json({ success: true, message: 'Matakuliah berhasil dibuat' });
     } catch (error) {
+        // Tangkap error jika kode mk duplikat (jika ada unique constraint)
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ success: false, message: 'Kode MK sudah ada!' });
+        }
         res.status(500).json({ success: false, message: error.message });
     }
 };
 
-// UPDATE (Update: Tambah semester & id_jurusan)
+// UPDATE (Update Validasi)
 const updateMatakuliah = async (req, res) => {
     try {
         const { id } = req.params;
         const { kode_mk, nama_mk, sks, semester, id_jurusan } = req.body;
         
+        // 1. VALIDASI PANJANG KODE MK
+        if (!kode_mk || kode_mk.length < 8 || kode_mk.length > 12) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Kode MK wajib 8 - 12 karakter!' 
+            });
+        }
+
         const sql = `UPDATE matakuliah SET kode_mk=?, nama_mk=?, sks=?, semester=?, id_jurusan=? WHERE id=?`;
         await db.query(sql, [kode_mk, nama_mk, sks, semester, id_jurusan || null, id]);
         
         res.json({ success: true, message: 'Matakuliah berhasil diupdate' });
     } catch (error) {
+        if (error.code === 'ER_DUP_ENTRY') {
+            return res.status(400).json({ success: false, message: 'Kode MK sudah ada!' });
+        }
         res.status(500).json({ success: false, message: error.message });
     }
 };

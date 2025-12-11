@@ -1,10 +1,22 @@
 const db = require('../config/db');
 
-// GET ALL (Diperbarui: ORDER BY nim ASC)
+// GET ALL
 const getAllMahasiswa = async (req, res) => {
     try {
-        // Tambahkan pengurutan berdasarkan NIM secara Ascending (A->Z/Kecil->Besar)
-        const [rows] = await db.query('SELECT * FROM mahasiswa ORDER BY nim ASC');
+        // PERBAIKAN: 
+        // 1. Ambil m.* (Semua data mhs: tgl_lahir, jk, dll)
+        // 2. JOIN langsung dengan jurusan (biar frontend terima beres)
+        const sql = `
+            SELECT 
+                m.*, 
+                j.nama_jurusan, 
+                j.fakultas
+            FROM mahasiswa m
+            LEFT JOIN jurusan j ON m.id_jurusan = j.id
+            ORDER BY m.nama_lengkap ASC
+        `;
+        
+        const [rows] = await db.query(sql);
         res.json({ success: true, data: rows });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
