@@ -1,88 +1,112 @@
 <script setup>
-import { defineProps, defineEmits } from 'vue';
+import { computed } from 'vue';
+import { useRoute } from 'vue-router'; // Kita hanya butuh useRoute untuk info user/path
+import { confirmDialog } from '../utils/swal';
 
-import { confirmDialog, showToast } from '../utils/swal';
+const props = defineProps({
+    isOpen: Boolean,
+    user: Object
+});
 
-// 1. TERIMA PROPS 'user'
-const props = defineProps(['activeTab', 'isOpen', 'user']);
-const emit = defineEmits(['changeTab', 'triggerLogout']);
-
-const menuItems = [
-  { id: 'home', label: 'Dashboard', icon: 'fas fa-home' },
-  { id: 'mahasiswa', label: 'Data Mahasiswa', icon: 'fas fa-user-graduate' },
-  { id: 'jurusan', label: 'Data Jurusan', icon: 'fas fa-university' },
-  { id: 'matakuliah', label: 'Data Matakuliah', icon: 'fas fa-book' },
-  { id: 'krs', label: 'Input KRS', icon: 'fas fa-file-signature' },
-];
-
-const selectTab = (id) => { emit('changeTab', id); };
+const route = useRoute(); // Untuk akses route saat ini
+const emit = defineEmits(['triggerLogout', 'toggle']);
 
 const logout = async () => {
-    const yakin = await confirmDialog(
-        'Logout?', 
-        'Anda harus login kembali untuk mengakses sistem.', 
-        'Ya, Keluar'
-    );
-
-    if(yakin) {
-        showToast('Anda berhasil logout', 'info');
-        emit('triggerLogout');
+    const yakin = await confirmDialog('Konfirmasi', 'Yakin ingin keluar dari sistem?');
+    if (yakin) {
+        emit('triggerLogout'); 
     }
 };
+
+// Kelas CSS untuk menu Aktif vs Tidak Aktif
+const activeClass = "bg-indigo-700 text-white shadow-lg translate-x-1";
+const inactiveClass = "text-indigo-100 hover:bg-indigo-800 hover:text-white";
 </script>
 
 <template>
-  <aside 
-    class="w-64 bg-slate-900 text-white flex flex-col h-screen fixed left-0 top-0 shadow-xl z-50 transition-transform duration-300 ease-in-out"
-    :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
-  >
-    
-    <div class="h-16 flex items-center justify-center border-b border-slate-700 bg-slate-950">
-      <i class="fas fa-graduation-cap text-indigo-500 text-2xl mr-3"></i>
-      <span class="text-xl font-bold tracking-wider">SIAKAD<span class="text-indigo-500">MINI</span></span>
-    </div>
+    <div v-if="isOpen" class="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden" @click="$emit('toggle')"></div>
 
-    <div class="p-6 flex items-center border-b border-slate-800 bg-slate-900">
-      <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold text-lg uppercase">
-        {{ user?.nama ? user.nama.charAt(0) : 'A' }}
-      </div>
-      <div class="ml-3 overflow-hidden">
-        <p class="text-sm font-semibold truncate w-32">
-            {{ user?.nama || 'Pengguna' }}
-        </p>
-        <p class="text-xs text-slate-400">
-            @{{ user?.username || 'user' }}
-        </p>
-      </div>
-    </div>
+    <aside 
+        class="fixed inset-y-0 left-0 z-50 w-64 bg-indigo-900 text-white transform transition-transform duration-300 ease-in-out shadow-xl flex flex-col"
+        :class="isOpen ? 'translate-x-0' : '-translate-x-full'"
+    >
+        <div class="h-16 flex items-center justify-center border-b border-indigo-800 bg-indigo-950 shadow-md">
+            <div class="flex items-center gap-3">
+                <i class="fas fa-university text-2xl text-yellow-400"></i>
+                <h1 class="text-xl font-bold tracking-wide">SIAKAD <span class="text-yellow-400">MINI</span></h1>
+            </div>
+        </div>
 
-    <nav class="flex-1 overflow-y-auto py-4">
-      <ul class="space-y-1">
-        <li v-for="item in menuItems" :key="item.id">
-          <button 
-            @click="selectTab(item.id)"
-            :class="[
-              'w-full flex items-center px-6 py-3 text-sm font-medium transition-all duration-200 border-l-4',
-              activeTab === item.id 
-                ? 'bg-slate-800 border-indigo-500 text-indigo-400' 
-                : 'border-transparent text-slate-300 hover:bg-slate-800 hover:text-white hover:border-slate-600'
-            ]"
-          >
-            <i :class="[item.icon, 'w-6 text-center text-lg']"></i>
-            <span class="ml-3">{{ item.label }}</span>
-          </button>
-        </li>
-      </ul>
-    </nav>
+        <nav class="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+            
+            <p class="px-4 text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2">Main Menu</p>
 
-    <div class="p-4 border-t border-slate-800">
-      <button 
-        @click="logout" 
-        class="w-full flex items-center px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded transition"
-      >
-        <i class="fas fa-sign-out-alt w-6"></i>
-        <span>Logout</span>
-      </button>
-    </div>
-  </aside>
+            <router-link 
+                to="/" 
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 group"
+                :class="route.path === '/' ? activeClass : inactiveClass"
+            >
+                <i class="fas fa-home w-6 text-center group-hover:scale-110 transition-transform"></i>
+                <span class="ml-3 font-medium text-sm">Dashboard</span>
+            </router-link>
+
+            <router-link 
+                to="/mahasiswa" 
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 group"
+                :class="route.path.startsWith('/mahasiswa') ? activeClass : inactiveClass"
+            >
+                <i class="fas fa-user-graduate w-6 text-center group-hover:scale-110 transition-transform"></i>
+                <span class="ml-3 font-medium text-sm">Data Mahasiswa</span>
+            </router-link>
+
+            <router-link 
+                to="/jurusan" 
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 group"
+                :class="route.path.startsWith('/jurusan') ? activeClass : inactiveClass"
+            >
+                <i class="fas fa-building w-6 text-center group-hover:scale-110 transition-transform"></i>
+                <span class="ml-3 font-medium text-sm">Data Jurusan</span>
+            </router-link>
+
+            <router-link 
+                to="/matakuliah" 
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 group"
+                :class="route.path.startsWith('/matakuliah') ? activeClass : inactiveClass"
+            >
+                <i class="fas fa-book w-6 text-center group-hover:scale-110 transition-transform"></i>
+                <span class="ml-3 font-medium text-sm">Data Matakuliah</span>
+            </router-link>
+
+            <p class="px-4 text-xs font-semibold text-indigo-400 uppercase tracking-wider mt-6 mb-2">Akademik</p>
+
+            <router-link 
+                to="/krs" 
+                class="w-full flex items-center px-4 py-3 rounded-lg transition-all duration-200 group"
+                :class="route.path.startsWith('/krs') ? activeClass : inactiveClass"
+            >
+                <i class="fas fa-edit w-6 text-center group-hover:scale-110 transition-transform"></i>
+                <span class="ml-3 font-medium text-sm">Input Nilai / KRS</span>
+            </router-link>
+
+        </nav>
+
+        <div class="p-4 border-t border-indigo-800 bg-indigo-950">
+            <div class="flex items-center gap-3 mb-3 px-2">
+                <div class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-xs font-bold text-white shadow">
+                    {{ user?.username?.charAt(0).toUpperCase() || 'A' }}
+                </div>
+                <div class="overflow-hidden">
+                    <p class="text-xs font-bold text-white truncate">{{ user?.nama_lengkap || 'Administrator' }}</p>
+                    <p class="text-[10px] text-indigo-300 truncate capitalize">{{ user?.role || 'Admin' }}</p>
+                </div>
+            </div>
+            
+            <button 
+                @click="logout"
+                class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2 rounded text-xs font-bold transition-colors shadow-md active:scale-95"
+            >
+                <i class="fas fa-sign-out-alt"></i> Keluar
+            </button>
+        </div>
+    </aside>
 </template>
